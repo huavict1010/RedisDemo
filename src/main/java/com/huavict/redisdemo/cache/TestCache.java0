@@ -1,0 +1,41 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024-2024. All rights reserved.
+ */
+
+package com.huavict.redisdemo.cache;
+
+import com.huavict.redisdemo.dao.MetadataWithTagDAO;
+import com.huavict.redisdemo.dao.po.MetadataWithTagPO;
+import com.huavict.redisdemo.enums.InfoSecLevel;
+import com.huavict.redisdemo.enums.PrivacyLevel;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * TODO
+ *
+ * @author l30055129
+ * @since 2024-03-12 09:20
+ */
+
+@Component
+@Slf4j
+public class TestCache {
+    @Autowired
+    private MetadataWithTagDAO metadataWithTagDAO;
+    @Cacheable(cacheNames = "test", key = "#num")
+    public String checkCache(int num) {
+        return "test" + num;
+    }
+
+    @Cacheable(value = {"damdService-DBTrffic"}, key = "#projectId")
+    public List<MetadataWithTagPO> checkCache(String projectId) throws Exception {
+        log.info("The cache of " + projectId + " does not exist");
+        List<MetadataWithTagPO> metadataWithTagPOList = metadataWithTagDAO.findByAppIdAndTag(projectId, InfoSecLevel.TOP_SECRET.getValue(), PrivacyLevel.SENSITIVE_PERSONAL_DATA.getValue());
+        return metadataWithTagPOList;
+    }
+}

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~ Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huavict.redisdemo.dao.MetadataWithTagDAO">
+    <select id="findByAppIdAndTag" resultType="com.huavict.redisdemo.dao.po.MetadataWithTagPO">
+        SELECT enterprise_id,
+               project_id,
+               source,
+               source_id,
+               database_name,
+               table_name,
+               column_name,
+               security_level,
+               private_level
+        FROM `damd-beta`.dsp_metadata_asset_t_copy
+        WHERE project_id = #{appId,jdbcType=VARCHAR}
+          AND (security_level = #{securityLevel,jdbcType=VARCHAR}
+            OR private_level = #{privateLevel,jdbcType=VARCHAR})
+          AND delete_flag = 'N';
+    </select>
+
+    <select id="findByAppIdAndIssueNo" resultType="com.huavict.redisdemo.dao.po.MetadataWithTagPO">
+        SELECT DISTINCT damd.enterprise_id,
+                        damd.project_id,
+                        damd.source,
+                        damd.source_id,
+                        database_name,
+                        table_name,
+                        column_name,
+                        security_level,
+                        private_level
+        FROM `damd-beta`.dsp_metadata_asset_t_copy damd
+                 Left JOIN `sdg-sit`.dsp_asset_issue_relation_t sdg
+                           ON source_id = asset_id
+        WHERE damd.project_id = #{appId,jdbcType=VARCHAR}
+          AND asset_id IS NOT NULL
+          AND asset_id != '';
+    </select>
+
+    <select id="findByAppIdAndField" resultType="com.huavict.redisdemo.dao.po.RiskIssuePO">
+        select a.*
+        from privacy_pco_dev.risk_issues_info_t_copy a
+                 join `sdg-sit`.dsp_asset_issue_relation_t b ON a.issue_no = b.issue_no
+                 join `damd-beta`.dsp_metadata_asset_t_copy c on b.asset_id = c.source_id
+        WHERE c.project_id = #{projectId,jdbcType=VARCHAR}
+          AND c.database_name = #{databaseName,jdbcType=VARCHAR}
+          AND c.table_name = #{tableName,jdbcType=VARCHAR}
+          AND c.column_name = #{columnName,jdbcType=VARCHAR}
+          AND b.asset_id IS NOT NULL
+          AND b.asset_id != '';
+    </select>
+
+    <update id="updateIssueList" parameterType="java.util.List">
+        <foreach collection="list" item="item" index="index" open="" close="" separator=";">
+            UPDATE privacy_pco_dev.risk_issues_info_t_copy
+            <set>
+                <if test='item.lastUpdatedBy != null'>
+                    `last_updated_by`=#{item.lastUpdatedBy,jdbcType=VARCHAR},
+                </if>
+                <if test='item.deleteFlag != null'>
+                    `delete_flag`=#{item.deleteFlag,jdbcType=VARCHAR},
+                </if>
+                `last_update_date`=now()
+            </set>
+            WHERE
+            `id` = #{item.id,jdbcType=BIGINT}
+            AND object_type = #{item.objectType, jdbcType = VARCHAR}
+            AND `object_code` = #{item.objectCode,jdbcType=VARCHAR}
+        </foreach>
+    </update>
+
+    <update id="updateIssueRelation" parameterType="java.lang.String">
+        UPDATE
+            `sdg-sit`.dsp_asset_issue_relation_t
+        set last_update_date=now()
+        where issue_no = #{issueNo, jdbcType=VARCHAR}
+    </update>
+
+    <update id="updateIssue" parameterType="java.lang.String">
+        UPDATE
+            privacy_pco_dev.risk_issues_info_t_copy
+        set last_update_date=now()
+        where issue_no = #{issueNo, jdbcType=VARCHAR}
+    </update>
+
+    <insert id="saveRiskIssue" useGeneratedKeys="true" keyProperty="id" keyColumn="id"
+            parameterType="com.huavict.redisdemo.dao.po.RiskIssuePO">
+        INSERT INTO privacy_pco_dev.risk_issues_info_t_copy
+        (`object_type`,
+         `object_code`,
+         `issue_no`,
+         `risk_type`,
+         `compliance_item`,
+         `compliance_type`,
+         `title`,
+         `guidance`,
+         `detail`,
+         `owner`,
+         `remark`,
+         `enterprise_id`,
+         `delete_flag`,
+         `created_by`,
+         `creation_date`,
+         `last_updated_by`,
+         `last_update_date`,
+         `expiration_time`,
+         `latest_confirmation_time`,
+         `latest_closed_time`,
+         `status`)
+        VALUES (#{item.objectType,jdbcType=INTEGER},
+                #{item.objectCode,jdbcType=VARCHAR},
+                #{item.issueNo,jdbcType=VARCHAR},
+                #{item.riskType,jdbcType=VARCHAR},
+                #{item.complianceItem,jdbcType=VARCHAR},
+                #{item.complianceType,jdbcType=VARCHAR},
+                #{item.title,jdbcType=VARCHAR},
+                #{item.guidance,jdbcType=VARCHAR},
+                #{item.detail,jdbcType=VARCHAR},
+                #{item.owner,jdbcType=VARCHAR},
+                #{item.remark,jdbcType=VARCHAR},
+                #{item.enterpriseId,jdbcType=VARCHAR},
+                #{item.deleteFlag,jdbcType=VARCHAR},
+                #{item.createdBy,jdbcType=VARCHAR},
+                now(),
+                #{item.lastUpdatedBy,jdbcType=VARCHAR},
+                now(),
+                #{item.expirationTime,jdbcType=VARCHAR},
+                #{item.latestConfirmationTime,jdbcType=VARCHAR},
+                #{item.latestClosedTime,jdbcType=VARCHAR},
+                #{item.status,jdbcType=VARCHAR})
+    </insert>
+
+    <insert id="createAssetIssueRelation" parameterType="java.util.List">
+        INSERT IGNORE INTO `sdg-sit`.`dsp_asset_issue_relation_t`
+        (`asset_id`,
+         `compliance_item`,
+         `issue_no`,
+         `enterprise_id`,
+         `project_id`,
+         `module_code`,
+         `created_by`,
+         `creation_date`,
+         `last_updated_by`,
+         `last_update_date`)
+        VALUES (#{item.assetId,jdbcType=VARCHAR},
+                #{item.checkItem,jdbcType=VARCHAR},
+                #{item.issueNo,jdbcType=VARCHAR},
+                #{item.enterpriseId,jdbcType=VARCHAR},
+                #{item.projectId,jdbcType=VARCHAR},
+                #{item.moduleCode,jdbcType=VARCHAR},
+                #{item.createdBy,jdbcType=VARCHAR},
+                now(),
+                #{item.lastUpdatedBy,jdbcType=VARCHAR},
+                now())
+    </insert>
+
+    <delete id="deleteIssueById" parameterType="long">
+        DELETE
+        FROM privacy_pco_dev.risk_issues_info_t_copy
+        WHERE id = #{id}
+    </delete>
+</mapper>
